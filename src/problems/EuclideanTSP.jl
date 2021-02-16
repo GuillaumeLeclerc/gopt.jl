@@ -19,34 +19,37 @@ end
 function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
     numCities, dims = size(problemData)
 
-    randomInit(state) = state.order .= Random.randperm(numCities)
+    # Make julia create a compiled version of the code for these specific problem sizes
+    function superFastGen(::Val{dims}, ::Val{numCities}) where {dims, numCities}
 
-    # We assume proper indices !!!!
-    @inline @inbounds function distance(a, b, order, problemData)
-        result = 0.0
-        a = order[a]
-        b = order[b]
-        for j in 1:dims
-            result += (problemData[a, j] - problemData[b, j]) ^2
+        randomInit(state) = state.order .= Random.randperm(numCities)
+
+        # We assume proper indices !!!!
+        function distance(a, b, order, problemData)
+            result = 0.0
+            for j in 1:dims
+                result += (problemData[order[a], j] - problemData[order[b], j]) ^2
+            end
+            result
         end
-        return result
-    end
 
-    function loss(state, problemData)
-        order = state.order
-        # The first is the link from the end to start
-        result = distance(1, numCities, order, problemData)
-        for i in 2:numCities
-            result += distance(i , i - 1, order, problemData)
+        function loss(state, problemData)
+            order = state.order
+            # The first is the link from the end to start
+            result = distance(1, numCities, order, problemData)
+            for i in 2:numCities
+                result += distance(i , i - 1, order, problemData)
+            end
+            result
         end
-        result
-    end
 
-    (
-     solType=TSPSolution{numCities},
-     loss=loss,
-     init=randomInit
-    )
+        (
+         solType=TSPSolution{numCities},
+         loss=loss,
+         init=randomInit
+        )
+    end
+    superFastGen(Val(dims), Val(numCities))
 end
 
 
