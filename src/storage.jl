@@ -114,6 +114,17 @@ end
     return result
 end
 
+# Copy a state from another
+@generated function initFromFields(dest::StoreElement{T, I, D, L, Store{T, I, D, L}}, data...) where {T, I, D, L}
+    ks = I.typesInfo
+    instructions = []
+    for (i, f) in enumerate(fieldnames(T))
+        push!(instructions, :(setproperty!(dest, $(QuoteNode(f)), data[$(i)])))
+    end
+    result = Expr(:block, instructions..., :dest)
+    return result
+end
+
 # Create a view on the particular element that we are looking at
 function Base.setindex!(store::Store{T, I, D, L}, source::StoreElement{T, I, D, L, Store{T, I, D, L}}, II...) where {T, I, D, L}
     dest = StoreElement{T, I, D, L, Store{T, I, D, L}}(store, II)
