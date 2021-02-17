@@ -107,32 +107,19 @@ import .Storage
 import .Optim
 import Random
 
+# Code generation
 data = TSP.generateRandomTSPData(1000, 2)
 problem = Optim.completeImplementation(TSP.generateProblemForData(data), false)
-stateStorage = Storage.allocateCPU(problem.solType, (2, ))
+optimizer = Optim.ExhaustiveLocalSearch(;problem...)
+# println(keys(optimizer))
+
+#Allocation
+stateStorage = Storage.allocateCPU(problem.solType, (optimizer.solutionStates, ))
 dataStorage = Storage.allocateCPU(problem.dataType, (1, ))[1]
+optimStorage = Storage.allocateCPU(optimizer.stateType, (1,))
+
+# Initialization
 Storage.initFromFields(dataStorage, problem.data...)
 problem.init(stateStorage[1])
-loss = problem.loss(stateStorage[1], dataStorage)
 
-function optimize(storage, problem, data)
-    problem.init(stateStorage[1])
-    loss = problem.loss(stateStorage[1], data)
-    println("startLoss ", problem.loss(stateStorage[1], data))
-    stateStorage[2] = stateStorage[1]
-    first = stateStorage[1]
-    other = stateStorage[2]
-    a = 0
-    for i in 1:1000000
-        direction = Tuple(Random.rand(problem.neighborSpace))
-        newLoss = problem.neighborLoss(loss, other, data, direction...)
-        if newLoss > loss
-            stateStorage[2] = stateStorage[1]
-        else
-            loss = newLoss
-            stateStorage[1] = stateStorage[2]
-        end
-    end
-    println("End loss", problem.loss(stateStorage[1], data))
-    a
-end
+nothing
