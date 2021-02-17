@@ -5,7 +5,7 @@ import ..Storage
 
 function RandomLocalSearch(problem)
 
-    function optimize(state, stateStorage, problem, data, iterations=1000000)
+    function optimize(state, stateStorage, data, iterations=1000000)
         loss = problem.loss(stateStorage[1], data)
         stateStorage[2] = stateStorage[1]
         first = stateStorage[1]
@@ -25,8 +25,8 @@ function RandomLocalSearch(problem)
     end
 
     (
-     state=nothing, # The type of state required by this optimizer
-     stateInit=nothing, # How to init the state of this optimizer
+     stateType=nothing, # No need to allocate memory for this optimizer
+     init=nothing, # No need to initialize this optimizer
      solutionStates=2, # How many solution states does this solver uses
      optimize=optimize, # What is doing the optimizer to solve the problem
     )

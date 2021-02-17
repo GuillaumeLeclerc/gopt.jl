@@ -128,6 +128,14 @@ function Base.getindex(partialView::StorePartialElement{T, I, D, L, Store{T, I, 
     end
 end
 
+# Create a view on the particular element that we are looking at
+function Base.setindex!(partialView::StorePartialElement{T, I, D, L, Store{T, I, D, L}, F},
+                        source::StoreElement{T, I, D, L, Store{T, I, D, L}},
+                        i::Int) where {T, I, D, L, F}
+    dest = partialView[i]
+    copy(dest, source)
+end
+
 
 function Base.show(io::IO, store::Store{T, I, D, L}) where {T, I, D, L}
     print(io, "Store{$T}($(store.size))")
