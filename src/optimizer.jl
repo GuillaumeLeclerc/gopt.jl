@@ -3,40 +3,6 @@ module Optim
 import Random
 import ..Storage
 
-function completeImplementation(problem, debug=false)
-    problemDict = Dict(pairs(problem))
-
-    if hasproperty(problem, :withDelta) && problem.withDelta
-
-        @inline function neighborLoss(previousLoss, currentState, problemData, d...)
-            delta = problem.neighbor(currentState, problemData, d...)
-            newLoss = previousLoss + delta
-            return newLoss
-        end
-
-        function checkedNeighborLoss(previousLoss, currentState, problemData, d...)
-            result = neighborLoss(previousLoss, currentState, problemData, d...)
-            @assert isapprox(result, problem.loss(currentState, problemData))
-            return result
-        end
-
-        if debug
-            problemDict[:neighborLoss] = checkedNeighborLoss
-        else
-            problemDict[:neighborLoss] = neighborLoss
-        end
-    else
-        function slowNeighborLoss(previousLoss, currentState, problemData, d...)
-            problem.neighbor(currentState, problemData, d...)
-            return problem.loss(currentState, problemData)
-        end
-
-        problemDict[:neighborLoss] = slowNeighborLoss
-    end
-
-    (;problemDict...)
-end
-
 function RandomLocalSearch(problem)
 
     function optimize(state, stateStorage, problem, data, iterations=1000000)
@@ -104,6 +70,9 @@ function ExhaustiveLocalSearch(problem)
             idx += 1
             if idx > length(problem.neighborSpace)
                 idx = 1
+                if !hasImproved
+                    break
+                end
             end
         end
 

@@ -1,8 +1,3 @@
-include("../storage.jl")
-include("../optimizer.jl")
-a = CartesianIndices((5, ))
-
-
 module TSP
 
 import Random
@@ -100,27 +95,3 @@ end
 export generateRandomTSPData, generateProblemForData
 
 end
-
-import .TSP
-
-import .Storage
-import .Optim
-import Random
-
-# Code generation
-data = TSP.generateRandomTSPData(1000, 2)
-problem = Optim.completeImplementation(TSP.generateProblemForData(data), false)
-optimizer = Optim.ExhaustiveLocalSearch(problem)
-# println(keys(optimizer))
-
-#Allocation
-stateStorage = Storage.allocateCPU(problem.solType, (optimizer.solutionStates, ))
-dataStorage = Storage.allocateCPU(problem.dataType, (1, ))[1]
-optimStorage = Storage.allocateCPU(optimizer.stateType, (1,))
-
-# Initialization
-Storage.initFromFields(dataStorage, problem.data...)
-problem.init(stateStorage[1])
-optimizer.init(optimStorage[1])
-
-nothing

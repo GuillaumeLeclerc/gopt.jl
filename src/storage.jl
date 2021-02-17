@@ -84,6 +84,17 @@ end
 # I: Parsed info about the type (performance optimization)
 # D: Number of dimensions
 # L: Layout (:cpu or :gpu)
+# O: Type of the the reference
+# F: The number of filled dimensions
+struct StorePartialElement{T, I, D, L, O, F}
+    _target::O # Pointer to the Store this Element belongs to
+    _cursor::NTuple{F, Int} # The index of the element selected
+end
+
+# T: Type (The struct)
+# I: Parsed info about the type (performance optimization)
+# D: Number of dimensions
+# L: Layout (:cpu or :gpu)
 struct Store{T, I, D, L} <: AbstractArray{StoreElement, D}
     size::NTuple{D, Int}
     storage::AbstractArray{UInt8, 1}
@@ -96,9 +107,30 @@ function Base.getindex(store::Store{T, I, D, L}, II...) where {T, I, D, L}
     StoreElement{T, I, D, L, Store{T, I, D, L}}(store, II[begin:D])
 end
 
+# Create a view on the particular element that we are looking at
+function Base.getindex(store::Store{T, I, D, L}, i::Int) where {T, I, D, L}
+    newCursor = (i, )
+    if length(newCursor) == D
+        return StoreElement{T, I, D, L, Store{T, I, D, L}}(store, newCursor)
+    else
+        return StorePartialElement{T, I, D, L, Store{T, I, D, L}, length(newCursor)}(store, newCursor)
+    end
+end
+
+# Create a view on the particular element that we are looking at
+function Base.getindex(partialView::StorePartialElement{T, I, D, L, Store{T, I, D, L}, F}, i::Int) where {T, I, D, L, F}
+    newCursor = ((getfield(partialView, :_cursor))..., i)
+    store = getfield(partialView, :_target)
+    if length(newCursor) == D
+        return StoreElement{T, I, D, L, Store{T, I, D, L}}(store, newCursor)
+    else
+        return StorePartialElement{T, I, D, L, Store{T, I, D, L}, length(newCursor)}(store, newCursor)
+    end
+end
+
 
 function Base.show(io::IO, store::Store{T, I, D, L}) where {T, I, D, L}
-    print(io, "hoho")
+    print(io, "Store{$T}($(store.size))")
 end
 
 
