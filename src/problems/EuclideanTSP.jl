@@ -57,7 +57,9 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
         @inline function simpleNeighborhood(currentState, problemData, a, b)
             order = currentState.order
             coords = problemData.coords
-            d(a, b) = distance(checkBounds(a), checkBounds(b), order, coords)
+            @inline function d(a, b)
+                distance(checkBounds(a), checkBounds(b), order, coords)
+            end
 
             if b < a
                 a, b = b, a
@@ -68,7 +70,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
 
             loss_diff = 0.0
             loss_diff -= d(a - 1, a) + d(a, a + 1) + d(b - 1, b) + d(b, b + 1)
-            order[a], order[b] = order[b], order[a]
+            @inbounds order[a], order[b] = order[b], order[a]
             loss_diff += d(a - 1, a) + d(a, a + 1) + d(b - 1, b) + d(b, b + 1)
             loss_diff
         end

@@ -184,18 +184,21 @@ function Base.show(io::IO, lookup::StoreElement{T, I, D, L, O}) where {T, I, D, 
     print(io, "StoreElement{$T, $L}($(target.size), $(cursor))")
 end
 
-@inline function fastGetType(T, s::Symbol)
-    tpe = fieldtype(T, s)
-    if isprimitivetype(tpe)
-        tpe
-    else
-        fieldtype(T, s).parameters[1]
+@inline @generated function fastGetType(::Val{T}, s::Symbol) where {T}
+    instructions = []
+    for f in fieldnames(T)
+        tpe = fieldtype(T, f)
+        if !isprimitivetype(tpe)
+            tpe = tpe.parameters[1]
+        end
+        push!(instructions, :(if s == $(QuoteNode(f)); return $tpe; end))
     end
+    result = Expr(:block, instructions..., :(return $T))
 end
 
 # This one is pretty tricky...
 @inbounds @inline function getUnderlyingStorage(lookup::StoreElement{T, I, D, L, O}, s::Symbol) where {T, I, D, L, O}
-    tpe=fastGetType(T, s)
+    tpe=fastGetType(Val(T), s)
     storeStrides = I.storeStrides
     target = getfield(lookup, :_target)
     cursor = getfield(lookup, :_cursor)
