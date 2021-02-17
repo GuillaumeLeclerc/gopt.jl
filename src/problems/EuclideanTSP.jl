@@ -34,17 +34,17 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
         randomInit(state) = state.order .= Random.randperm(numCities)
 
         # We assume proper indices !!!!
-        @Base.pure @inline @inbounds function distance(a, b, order, coords)
+        @Base.pure @inline function distance(a, b, order, coords)
             result = 0.0
             for j in 1:dims
-                result += (coords[order[a], j] - coords[order[b], j]) ^2
+                @inbounds result += (coords[order[a], j] - coords[order[b], j]) ^2
             end
             result
         end
 
         checkBounds(n) = mod1(n, numCities)
 
-        @Base.pure function loss(state, problemData)
+        @inline @Base.pure function loss(state, problemData)
             order = state.order
             coords = problemData.coords
             result = distance(1, numCities, order, coords) # The first is the link from the end to start
@@ -54,7 +54,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
             result
         end
 
-        function simpleNeighborhood(currentState, problemData, a, b)
+        @inline function simpleNeighborhood(currentState, problemData, a, b)
             order = currentState.order
             coords = problemData.coords
             d(a, b) = distance(checkBounds(a), checkBounds(b), order, coords)
