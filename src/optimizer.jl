@@ -37,7 +37,7 @@ function completeImplementation(problem, debug=false)
     (;problemDict...)
 end
 
-function RandomLocalSearch(;problem...)
+function RandomLocalSearch(problem)
 
     function optimize(state, stateStorage, problem, data, iterations=1000000)
         loss = problem.loss(stateStorage[1], data)
@@ -72,26 +72,18 @@ struct ExhaustiveLocalSearchState
     hasImproved::Bool
 end
 
-function ExhaustiveLocalSearch(;problemDesc...)
-    function init(state, stateStorage)
+function ExhaustiveLocalSearch(problem)
+
+    function init(state)
         state.currentIteration = 1
         state.hasImproved = false
     end
 
-    println(keys(problemDesc))
-
     function optimize(state, stateStorage, data, iterations=1000000)
-        println("Hello 1")
         first = stateStorage[1]
-        println("Hello 2")
         other = stateStorage[2]
-        println("Hello 3")
-        println(typeof(problemDesc[1]))
 
-        loss = problemDesc.loss(first, data)
-        println("Hello 4")
-        println("Start ", loss)
-
+        loss = problem.loss(first, data)
 
         Storage.copy(other, first)
 
@@ -99,8 +91,8 @@ function ExhaustiveLocalSearch(;problemDesc...)
         hasImproved = state.hasImproved
 
         for i in 1:iterations
-            direction = problemDesc.neighborSpace[idx]
-            newLoss = problemDesc.neighborLoss(loss, other, data, direction...)
+            direction = Tuple(problem.neighborSpace[idx])
+            newLoss = problem.neighborLoss(loss, other, data, direction...)
             if newLoss > loss
                 Storage.copy(other, first)
             else
@@ -110,7 +102,7 @@ function ExhaustiveLocalSearch(;problemDesc...)
             end
 
             idx += 1
-            if idx > length(problemDesc.neighborSpace)
+            if idx > length(problem.neighborSpace)
                 idx = 1
             end
         end
@@ -118,13 +110,12 @@ function ExhaustiveLocalSearch(;problemDesc...)
         state.currentIteration = idx
         state.hasImproved = hasImproved
 
-        r = problemDesc.loss(stateStorage[1], data)
-        println("end ", r)
+        r = problem.loss(stateStorage[1], data)
     end
 
     (
      stateType=ExhaustiveLocalSearchState, # The type of state required by this optimizer
-     stateInit=init, # How to init the state of this optimizer
+     init=init, # How to init the state of this optimizer
      solutionStates=2, # How many solution states does this solver uses
      optimize=optimize, # What is doing the optimizer to solve the problem
     )

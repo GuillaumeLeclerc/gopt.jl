@@ -110,7 +110,7 @@ import Random
 # Code generation
 data = TSP.generateRandomTSPData(1000, 2)
 problem = Optim.completeImplementation(TSP.generateProblemForData(data), false)
-optimizer = Optim.ExhaustiveLocalSearch(;problem...)
+optimizer = Optim.ExhaustiveLocalSearch(problem)
 # println(keys(optimizer))
 
 #Allocation
@@ -121,5 +121,6 @@ optimStorage = Storage.allocateCPU(optimizer.stateType, (1,))
 # Initialization
 Storage.initFromFields(dataStorage, problem.data...)
 problem.init(stateStorage[1])
+optimizer.init(optimStorage[1])
 
 nothing
