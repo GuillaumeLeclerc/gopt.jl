@@ -59,7 +59,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
             result
         end
 
-        @inline function simpleNeighborhood(currentState, problemData, a, b)
+        function simpleNeighborhood(currentState, problemData, a, b)
             order = currentState.order
             coords = problemData.coords
             d(a, b) = distance(checkBounds(a), checkBounds(b), order, coords)
@@ -115,7 +115,7 @@ Storage.initFromFields(dataStorage, problem.data...)
 problem.init(stateStorage[1])
 loss = problem.loss(stateStorage[1], dataStorage)
 
-@inline function optimize(storage, problem, data)
+function optimize(storage, problem, data)
     problem.init(stateStorage[1])
     loss = problem.loss(stateStorage[1], data)
     println("startLoss ", problem.loss(stateStorage[1], data))
@@ -125,10 +125,11 @@ loss = problem.loss(stateStorage[1], dataStorage)
     a = 0
     for i in 1:1000000
         direction = Tuple(Random.rand(problem.neighborSpace))
-        newLoss = problem.neighbor(other, data, direction...)
-        if newLoss > 0
+        newLoss = problem.neighborLoss(loss, other, data, direction...)
+        if newLoss > loss
             stateStorage[2] = stateStorage[1]
         else
+            loss = newLoss
             stateStorage[1] = stateStorage[2]
         end
     end
