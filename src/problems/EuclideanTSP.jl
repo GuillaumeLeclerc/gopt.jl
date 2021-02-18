@@ -42,7 +42,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
             result
         end
 
-        checkBounds(n) = mod1(n, numCities)
+        @Base.pure @inline checkBounds(n) = mod1(n, numCities)
 
         @inline @Base.pure function loss(state, problemData)
             order = state.order
@@ -54,28 +54,49 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
             result
         end
 
-        @inline function simpleNeighborhood(currentState, problemData, dir)
-            a = dir[1]
-            b = dir[2]
-            order = currentState.order
-            coords = problemData.coords
-            @inline function d(a, b)
-                distance(checkBounds(a), checkBounds(b), order, coords)
-            end
-
-            if b < a
-                a, b = b, a
-            end
-
-            # swapping the same cities
-            if (a == b) return 0.0 end #swapping the same cities
-
-            loss_diff = 0.0
-            loss_diff -= d(a - 1, a) + d(a, a + 1) + d(b - 1, b) + d(b, b + 1)
-            @inbounds order[a], order[b] = order[b], order[a]
-            loss_diff += d(a - 1, a) + d(a, a + 1) + d(b - 1, b) + d(b, b + 1)
-            loss_diff
+        ### Swap2
+        @inline function swap2Propose(currentState, problemData, dir)
+                a, b = dir[1], dir[2]
+                if b < a
+                    a, b = b, a
+                end
+                @inline @Base.pure d(a, b) = distance(checkBounds(a), checkBounds(b),
+                                                      currentState.order, problemData.coords)
+                if (a == b) return 0.0 end #swapping the same cities
+                return (
+                        -(d(a - 1, a) + d(a, a + 1) + d(b - 1, b) + d(b, b + 1)) # old distances
+                        +(d(a - 1, b) + d(b, a + 1) + d(b - 1, a) + d(a, b + 1)) # new distances
+                       )
         end
+        @inline function swap2Apply(currentState, problemData, dir)
+            @inbounds a, b = dir[1], dir[2]
+            if b < a; a, b = b, a end
+            if (a == b) return end
+            order = currentState.order
+            @inbounds order[a], order[b] = order[b], order[a]
+        end
+        swap2 = (propose = swap2Propose, apply = swap2Apply)
+
+
+        @inline function opt2Propose(currentState, problemData, dir)
+                @inbounds a, b = dir[1], dir[2]
+                if b < a; a, b = b, a end
+                @inline @Base.pure d(a, b) = distance(checkBounds(a), checkBounds(b),
+                                                      currentState.order, problemData.coords)
+                if (a == b) || (a == 1 && b == numCities) return 0.0 end
+                (d(a - 1, b) + d(a, b + 1) - d(a - 1, a) - d(b, b + 1))
+        end
+        @inline function opt2Apply(currentState, problemData, dir)
+            @inbounds a, b = dir[1], dir[2]
+            if b < a; a, b = b, a end
+            if (a == b) || (a == 1 && b == numCities) return end
+            order = currentState.order
+            for i in 0:div((b - a + 1), 2) - 1
+                @inbounds order[a + i], order[b - i] = order[b - i], order[a + i]
+            end
+        end
+
+        opt2 = (propose = opt2Propose, apply = opt2Apply)
 
         (
          # Problem Data
@@ -88,8 +109,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
          loss=loss,
          # Exploration
          neighborSpace=CartesianIndices((numCities, numCities)), # What space to explore
-         neighbor=simpleNeighborhood, # How to explore
-         withDelta=true # Whether our neighbor function computes the delta loss
+         opt2...
         )
     end
     superFastGen(Val(dims), Val(numCities))

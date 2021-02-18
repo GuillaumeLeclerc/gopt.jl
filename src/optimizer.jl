@@ -6,19 +6,13 @@ import ..Storage
 function RandomLocalSearch(problem)
 
     function optimize(state, stateStorage, data, iterations, rng)
-        loss = problem.loss(stateStorage[1], data)
-        # stateStorage[2] = stateStorage[1]
-        first = stateStorage[1]
-        other = stateStorage[2]
+        solution = stateStorage[1]
         a = 0
         for i in 1:iterations
             direction = Tuple(Random.rand(rng, problem.neighborSpace))
-            newLoss = problem.neighborLoss(loss, other, data, direction)
-            if newLoss > loss
-                # stateStorage[2] = stateStorage[1]
-            else
-                loss = newLoss
-                # stateStorage[1] = stateStorage[2]
+            delta = problem.propose(solution, data, direction)
+            if delta < 0
+                problem.apply(solution, data, direction)
             end
         end
         problem.loss(stateStorage[1], data)
@@ -27,7 +21,7 @@ function RandomLocalSearch(problem)
     (
      stateType=nothing, # No need to allocate memory for this optimizer
      init=nothing, # No need to initialize this optimizer
-     solutionStates=2, # How many solution states does this solver uses
+     solutionStates=1, # How many solution states does this solver uses
      optimize=optimize, # What is doing the optimizer to solve the problem
     )
 

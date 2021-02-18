@@ -10,39 +10,6 @@ import ProgressMeter
 using ..Storage
 using RandomNumbers
 
-function completeImplementation(problem, debug=false)
-    problemDict = Dict(pairs(problem))
-
-    if hasproperty(problem, :withDelta) && problem.withDelta
-
-        @inline function neighborLoss(previousLoss, currentState, problemData, d...)
-            delta = problem.neighbor(currentState, problemData, d...)
-            newLoss = previousLoss + delta
-            return newLoss
-        end
-
-        function checkedNeighborLoss(previousLoss, currentState, problemData, d...)
-            result = neighborLoss(previousLoss, currentState, problemData, d...)
-            @assert isapprox(result, problem.loss(currentState, problemData))
-            return result
-        end
-
-        if debug
-            problemDict[:neighborLoss] = checkedNeighborLoss
-        else
-            problemDict[:neighborLoss] = neighborLoss
-        end
-    else
-        function slowNeighborLoss(previousLoss, currentState, problemData, d...)
-            problem.neighbor(currentState, problemData, d...)
-            return problem.loss(currentState, problemData)
-        end
-
-        problemDict[:neighborLoss] = slowNeighborLoss
-    end
-
-    (;problemDict...)
-end
 
 function runBlock(code, maxIter, maxTime, momentum=0.9, updateInterval=1)
     if maxIter isa Number || maxTime isa Number
@@ -63,14 +30,18 @@ function runBlock(code, maxIter, maxTime, momentum=0.9, updateInterval=1)
             break
         end
 
-        iterations = floor(Int, updateInterval * estimatedThroughput)
+        iterations = max(1, floor(Int, updateInterval * estimatedThroughput))
 
         if maxIter isa Number
             iterationsLeft = maxIter - iterationsDone
             iterations = min(iterations, iterationsLeft)
         end
 
-        timeTaken = @elapsed infos = code(iterations)
+
+        before = time()
+        infos = code(iterations)
+        timeTaken = time() - before
+
 
         iterationsDone += iterations
         lastThroughput = iterations / timeTaken
@@ -128,8 +99,7 @@ end
 
 function Base.setproperty!(m::Manager, s::Symbol, value)
     if s == :problem
-        filled = completeImplementation(value, getfield(m, :debug))
-        setfield!(m, :problem, filled)
+        setfield!(m, :problem, value)
     elseif s == :optimizer
         setfield!(m, :optimizer, value)
     else
@@ -185,13 +155,13 @@ import Random
 
 # Code generation
 
-data = TSP.generateRandomTSPData(1000, 2)
+data = TSP.generateRandomTSPData(100000, 2)
 manager = Ma.Manager()
 manager.problem = TSP.generateProblemForData(data)
 manager.optimizer = Optim.RandomLocalSearch(manager.problem)
 Ma.allocateStorage!(manager)
 Ma.init!(manager)
-Ma.run!(manager, 1000000000000, 10)
+Ma.run!(manager, 10000000000000, 600)
 
 #  # Initialization
 #  
