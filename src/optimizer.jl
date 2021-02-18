@@ -5,20 +5,20 @@ import ..Storage
 
 function RandomLocalSearch(problem)
 
-    function optimize(state, stateStorage, data, iterations=1000000)
+    function optimize(state, stateStorage, data, iterations, rng)
         loss = problem.loss(stateStorage[1], data)
-        stateStorage[2] = stateStorage[1]
+        # stateStorage[2] = stateStorage[1]
         first = stateStorage[1]
         other = stateStorage[2]
         a = 0
         for i in 1:iterations
-            direction = Tuple(Random.rand(problem.neighborSpace))
-            newLoss = problem.neighborLoss(loss, other, data, direction...)
+            direction = Tuple(Random.rand(rng, problem.neighborSpace))
+            newLoss = problem.neighborLoss(loss, other, data, direction)
             if newLoss > loss
-                stateStorage[2] = stateStorage[1]
+                # stateStorage[2] = stateStorage[1]
             else
                 loss = newLoss
-                stateStorage[1] = stateStorage[2]
+                # stateStorage[1] = stateStorage[2]
             end
         end
         problem.loss(stateStorage[1], data)
@@ -57,8 +57,8 @@ function ExhaustiveLocalSearch(problem)
         hasImproved = state.hasImproved
 
         for i in 1:iterations
-            direction = Tuple(problem.neighborSpace[idx])
-            newLoss = problem.neighborLoss(loss, other, data, direction...)
+            direction = problem.neighborSpace[idx]
+            newLoss = problem.neighborLoss(loss, other, data, direction)
             if newLoss > loss
                 Storage.copy(other, first)
             else
@@ -71,7 +71,7 @@ function ExhaustiveLocalSearch(problem)
             if idx > length(problem.neighborSpace)
                 idx = 1
                 if !hasImproved
-                    break
+                    # break
                 end
             end
         end

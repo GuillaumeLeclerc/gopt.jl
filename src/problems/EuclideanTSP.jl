@@ -54,7 +54,9 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
             result
         end
 
-        @inline function simpleNeighborhood(currentState, problemData, a, b)
+        @inline function simpleNeighborhood(currentState, problemData, dir)
+            a = dir[1]
+            b = dir[2]
             order = currentState.order
             coords = problemData.coords
             @inline function d(a, b)

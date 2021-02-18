@@ -8,6 +8,7 @@ using Printf
 import Base
 import ProgressMeter
 using ..Storage
+using RandomNumbers
 
 function completeImplementation(problem, debug=false)
     problemDict = Dict(pairs(problem))
@@ -41,6 +42,75 @@ function completeImplementation(problem, debug=false)
     end
 
     (;problemDict...)
+end
+
+function runBlock(code, maxIter, maxTime, momentum=0.9, updateInterval=1)
+    if maxIter isa Number || maxTime isa Number
+        p = ProgressMeter.Progress(1000)
+    else
+        p = ProgressMeter.ProgressUnknown()
+    end
+
+    startTime = time()
+    estimatedThroughput = 1.0
+    iterationsDone = 0
+    lastProgress = 0
+    currentProgress = 0.0
+    while true
+        if (maxTime isa Number) && time() - startTime > maxTime
+            break
+        elseif (maxIter isa Number ) && iterationsDone >= maxIter
+            break
+        end
+
+        iterations = floor(Int, updateInterval * estimatedThroughput)
+
+        if maxIter isa Number
+            iterationsLeft = maxIter - iterationsDone
+            iterations = min(iterations, iterationsLeft)
+        end
+
+        timeTaken = @elapsed infos = code(iterations)
+
+        iterationsDone += iterations
+        lastThroughput = iterations / timeTaken
+        estimatedThroughput = (momentum * estimatedThroughput) + (1 - momentum) * lastThroughput
+
+        ## Reporting
+        progresses = Vector{Float64}()
+
+        if maxIter isa Number
+            push!(progresses, iterationsDone / maxIter)
+        end
+
+        if maxTime isa Number
+            push!(progresses, (time() - startTime) / maxTime)
+        end
+
+        if length(progresses) > 0
+            currentProgress = maximum(progresses) * 1000
+            if currentProgress > lastProgress
+                improvement = floor(Int, currentProgress - lastProgress)
+                lastProgress = currentProgress
+                ProgressMeter.next!(p, step=improvement)
+            end
+        else
+            ProgressMeter.next!(p, step=iterations)
+        end
+
+
+        infos = Dict(pairs(infos))
+        infos[:t] = @sprintf("%i/s", (iterationsDone) / (time() - startTime))
+
+        strings = map(collect(infos)) do (key, value)
+            "$key=$value"
+        end
+        p.desc = "Optimizing ($(join(strings, ", "))) "
+    end
+
+    ProgressMeter.finish!(p)
+
+    return (iterationsDone, time() - startTime)
 end
 
 
@@ -84,34 +154,21 @@ function init!(m::Manager)
     end
 end
 
-function run!(m::Manager, maxIter=missing)
-    if ismissing(maxIter)
-        p = ProgressMeter.ProgressUnknown()
-    else
-        p = ProgressMeter.Progress(maxIter)
+function run!(m::Manager, maxIter=nothing, maxTime=nothing)
+    rng_xor = RandomNumbers.Xorshifts.Xoroshiro128Star()
+
+    optimStorage = nothing
+
+    if haskey(m.storage, :optimStorage)
+        optimStorage = m.storage[:optimStorage][1]
     end
 
-    blocksIter = 500000
-    iterationsDone = 0
-    startTime = time()
-    while true
-        optimStorage = nothing
-
-        if haskey(m.storage, :optimStorage)
-            optimStorage = m.storage[:optimStorage][1]
-        end
-
+    runBlock(maxIter, maxTime) do blocksIter
         m.optimizer.optimize(optimStorage, m.storage[:stateStorage][1],
-                             m.storage[:dataStorage], blocksIter)
-        iterationsDone += blocksIter
-        ProgressMeter.next!(p, step=blocksIter)
-        currentLoss = m.problem.loss(m.storage[:stateStorage][1][1], m.storage[:dataStorage])
-        throughput = (p.counter - p.start) /  (time() - p.tfirst)
-        p.desc = @sprintf("Optimizing (l=%.2f, t=%i/s) ", currentLoss, throughput)
-        if iterationsDone >= maxIter
-            ProgressMeter.finish!(p)
-            break
-        end
+                             m.storage[:dataStorage], blocksIter, rng_xor)
+        return (
+                loss=@sprintf("%.2f", m.problem.loss(m.storage[:stateStorage][1][1], m.storage[:dataStorage])),
+               )
     end
 end
 
@@ -134,7 +191,7 @@ manager.problem = TSP.generateProblemForData(data)
 manager.optimizer = Optim.RandomLocalSearch(manager.problem)
 Ma.allocateStorage!(manager)
 Ma.init!(manager)
-Ma.run!(manager, 100000000)
+Ma.run!(manager, 1000000000000, 10)
 
 #  # Initialization
 #  
