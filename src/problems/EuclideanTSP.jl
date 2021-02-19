@@ -1,6 +1,7 @@
 module TSP
 
 import Random
+using ProgressMeter
 import Base
 using ..Storage
 
@@ -41,8 +42,37 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
 
         randomInit(state, _) = state.order .= Random.randperm(numCities)
 
+        @Base.pure function rawDistance(a, b, coords)
+            result = 0.0
+            for j in 1:dims
+                @inbounds result += (coords[a, j] - coords[b, j]) ^2
+            end
+            result
+        end
+
         function nnInit(state, problemData)
-            # TODO
+            coords = problemData.coords
+            order = state.order
+            doneCities = zeros(Bool, numCities)
+            startIx = Random.rand(1:numCities)
+            order[1] = startIx
+            doneCities[startIx] = true
+            prev = startIx
+
+            @showprogress for i in 2:numCities
+                bestOther = 0
+                bestDistance = Inf32
+                for j in 1:numCities
+                    d = rawDistance(prev, j, coords)
+                    if !doneCities[j] && d < bestDistance
+                        bestOther = j
+                        bestDistance = d
+                    end
+                end
+                doneCities[i] = true
+                order[i] = bestOther
+                prev = bestOther
+            end
         end
 
 
@@ -117,7 +147,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
          data=(problemData, ), # What is the actual data we are solving for
          # Solution
          solType=TSPSolution{numCities}, # How to represent a solution
-         init=randomInit, # How to init the solution
+         init=nnInit, # How to init the solution
          # Loss
          loss=loss,
          # Exploration
