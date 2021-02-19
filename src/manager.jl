@@ -118,7 +118,7 @@ end
 
 function init!(m::Manager)
     Storage.initFromFields(m.storage[:dataStorage], m.problem.data...)
-    m.problem.init(m.storage[:stateStorage][1, 1])
+    m.problem.init(m.storage[:stateStorage][1, 1], m.storage[:dataStorage])
     if !isnothing(m.optimizer.stateType) && !isnothing(m.optimizer.init)
         m.optimizer.init(m.storage[:optimStorage][1])
     end
@@ -155,7 +155,7 @@ import Random
 
 # Code generation
 
-data = TSP.generateRandomTSPData(100000, 2)
+data = TSP.readTourFile("./pla85900.tsp")
 manager = Ma.Manager()
 manager.problem = TSP.generateProblemForData(data)
 manager.optimizer = Optim.RandomLocalSearch(manager.problem)

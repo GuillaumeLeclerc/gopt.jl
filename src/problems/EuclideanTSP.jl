@@ -9,6 +9,14 @@ function generateRandomTSPData(numCities, dims=2)
     Random.rand(numCities, dims)
 end
 
+function readTourFile(path)
+    file = open(path)
+    lines = readlines(file)
+    lines = filter(x -> isdigit(x[1]), lines)
+    data = [parse(Float32, split(x)[j]) for x=lines, j=2:3]
+    return data
+end
+
 # The state of a solution to the problem
 struct TSPSolution{N}
     order::SizedArray{Int32, N} # I doubt people will have more than 2**31 cities
@@ -31,7 +39,12 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
     # It makes the loss calculation stupidly fast for example
     function superFastGen(::Val{dims}, ::Val{numCities}) where {dims, numCities}
 
-        randomInit(state) = state.order .= Random.randperm(numCities)
+        randomInit(state, _) = state.order .= Random.randperm(numCities)
+
+        function nnInit(state, problemData)
+            # TODO
+        end
+
 
         # We assume proper indices !!!!
         @Base.pure @inline function distance(a, b, order, coords)
