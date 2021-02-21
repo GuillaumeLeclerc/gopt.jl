@@ -1,5 +1,9 @@
+#Framework
 include("./storage.jl")
 include("./optimizer.jl")
+include("./shuffler.jl")
+
+#Problem specific
 include("./problems/EuclideanTSP.jl")
 
 module Ma
@@ -80,6 +84,7 @@ function runBlock(code, maxIter, maxTime, momentum=0.9, updateInterval=1)
     end
 
     ProgressMeter.finish!(p)
+    println()
 
     return (iterationsDone, time() - startTime)
 end
@@ -88,81 +93,97 @@ end
 mutable struct Manager
     problem
     optimizer
+    shuffler
     storage::Dict{Symbol, Any}
     debug::Bool
 
     function Manager()
-        new(missing, missing, Dict{Symbol, Any}(), false)
+        new(missing, missing, missing, Dict{Symbol, Any}(), false)
     end
 end
 
-
-function Base.setproperty!(m::Manager, s::Symbol, value)
-    if s == :problem
-        setfield!(m, :problem, value)
-    elseif s == :optimizer
-        setfield!(m, :optimizer, value)
-    else
-        setfield!(m, s)
-    end
-end
 
 function allocateStorage!(m::Manager)
     m.storage[:stateStorage] = Storage.allocateCPU(m.problem.solType,
-                                                   (1, m.optimizer.solutionStates, ))
+                                                   (m.shuffler.popSize,
+                                                    m.optimizer.solutionStates, ))
     m.storage[:dataStorage] = Storage.allocateCPU(m.problem.dataType, (1, ))[1]
     if !isnothing(m.optimizer.stateType)
-        m.storage[:optimStorage] = Storage.allocateCPU(m.optimizer.stateType, (1,))
+        m.storage[:optimStorage] = Storage.allocateCPU(m.optimizer.stateType,
+                                                       (m.optimizer.solutionStates,))
     end
 end
 
 function init!(m::Manager)
     Storage.initFromFields(m.storage[:dataStorage], m.problem.data...)
-    m.problem.init(m.storage[:stateStorage][1, 1], m.storage[:dataStorage])
-    if !isnothing(m.optimizer.stateType) && !isnothing(m.optimizer.init)
-        m.optimizer.init(m.storage[:optimStorage][1])
+
+    # We only init the best state,
+    for i in 1:m.shuffler.popSize
+        m.problem.init(m.storage[:stateStorage][i, 1], m.storage[:dataStorage])
+        if !isnothing(m.optimizer.stateType) && !isnothing(m.optimizer.init)
+            m.optimizer.init(m.storage[:optimStorage][i])
+        end
     end
+
 end
 
 function run!(m::Manager, maxIter=nothing, maxTime=nothing)
-    rng_xor = RandomNumbers.Xorshifts.Xoroshiro128Star()
 
     optimStorage = nothing
 
-    if haskey(m.storage, :optimStorage)
-        optimStorage = m.storage[:optimStorage][1]
-    end
 
     runBlock(maxIter, maxTime) do blocksIter
-        m.optimizer.optimize(optimStorage, m.storage[:stateStorage][1],
-                             m.storage[:dataStorage], blocksIter, rng_xor)
+        losses = zeros(Float32, m.shuffler.popSize)
+        Base.Threads.@threads for i in 1:m.shuffler.popSize
+            rng_xor = RandomNumbers.Xorshifts.Xoroshiro128Star()
+            if haskey(m.storage, :optimStorage)
+                optimStorage = m.storage[:optimStorage][i]
+            end
+            state = m.storage[:stateStorage][i]
+            m.optimizer.optimize(optimStorage, state,
+                                 m.storage[:dataStorage], blocksIter, rng_xor)
+            loss = m.problem.loss(state[1], m.storage[:dataStorage])
+            losses[i] = loss
+        end
         return (
-                loss=@sprintf("%.2f", m.problem.loss(m.storage[:stateStorage][1][1], m.storage[:dataStorage])),
+                loss=@sprintf("%.3f - %3f", minimum(losses), maximum(losses)),
                )
     end
+end
+
+function bestSolution(m::Manager)
+    losses = zeros(Float32, m.shuffler.popSize)
+    Base.Threads.@threads for i in 1:m.shuffler.popSize
+        state = m.storage[:stateStorage][i]
+        loss = m.problem.loss(state[1], m.storage[:dataStorage])
+        losses[i] = loss
+    end
+    bestIx = argmin(losses)
+    return (losses[bestIx], m.storage[:stateStorage][bestIx][1])
 end
 
 export Manager
 
 end
 
+
 import .Ma
 import .TSP
 
 import .Storage
 import .Optim
-import Random
+import .Shufflers
 
 # Code generation
 
-data = TSP.readTourFile("./pla85900.tsp")
+# data = TSP.readTourFile("./pla85900.tsp")
+data = TSP.generateRandomTSPData(10000)
 manager = Ma.Manager()
 manager.problem = TSP.generateProblemForData(data)
 manager.optimizer = Optim.RandomLocalSearch(manager.problem)
+manager.shuffler = Shufflers.Independent(16)
 Ma.allocateStorage!(manager)
 Ma.init!(manager)
-Ma.run!(manager, 10000000000000, 600)
-
-#  # Initialization
-#  
-#  nothing
+Ma.run!(manager, 10000000000000, 6)
+loss, solution = Ma.bestSolution(manager)
+print("LOSS: ", loss)

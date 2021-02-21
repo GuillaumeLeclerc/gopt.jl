@@ -59,7 +59,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
             doneCities[startIx] = true
             prev = startIx
 
-            @showprogress for i in 2:numCities
+            @showprogress "Init state" for i in 2:numCities
                 bestOther = 0
                 bestDistance = Inf32
                 for j in 1:numCities
@@ -147,7 +147,7 @@ function generateProblemForData(problemData::AbstractArray{T, 2}) where {T}
          data=(problemData, ), # What is the actual data we are solving for
          # Solution
          solType=TSPSolution{numCities}, # How to represent a solution
-         init=nnInit, # How to init the solution
+         init=randomInit, # How to init the solution
          # Loss
          loss=loss,
          # Exploration
