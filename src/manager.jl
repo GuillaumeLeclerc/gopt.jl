@@ -94,16 +94,18 @@ mutable struct Manager
     problem
     optimizer
     shuffler
+    losses::Vector{Float32}
     storage::Dict{Symbol, Any}
     debug::Bool
 
     function Manager()
-        new(missing, missing, missing, Dict{Symbol, Any}(), false)
+        new(missing, missing, missing, Vector{Float32}(), Dict{Symbol, Any}(), false)
     end
 end
 
 
 function allocateStorage!(m::Manager)
+    resize!(m.losses, m.shuffler.popSize)
     m.storage[:stateStorage] = Storage.allocateCPU(m.problem.solType,
                                                    (m.shuffler.popSize,
                                                     m.optimizer.solutionStates, ))
@@ -133,32 +135,24 @@ function run!(m::Manager, maxIter=nothing, maxTime=nothing)
 
 
     runBlock(maxIter, maxTime) do blocksIter
-        losses = zeros(Float32, m.shuffler.popSize)
         Base.Threads.@threads for i in 1:m.shuffler.popSize
             rng_xor = RandomNumbers.Xorshifts.Xoroshiro128Star()
             if haskey(m.storage, :optimStorage)
                 optimStorage = m.storage[:optimStorage][i]
             end
             state = m.storage[:stateStorage][i]
-            m.optimizer.optimize(optimStorage, state,
-                                 m.storage[:dataStorage], blocksIter, rng_xor)
-            loss = m.problem.loss(state[1], m.storage[:dataStorage])
-            losses[i] = loss
+            loss = m.optimizer.optimize(optimStorage, state,
+                                        m.storage[:dataStorage], blocksIter, rng_xor)
+            m.losses[i] = loss
         end
         return (
-                loss=@sprintf("%.3f - %3f", minimum(losses), maximum(losses)),
+                loss=@sprintf("%.3f - %3f", minimum(m.losses), maximum(m.losses)),
                )
     end
 end
 
 function bestSolution(m::Manager)
-    losses = zeros(Float32, m.shuffler.popSize)
-    Base.Threads.@threads for i in 1:m.shuffler.popSize
-        state = m.storage[:stateStorage][i]
-        loss = m.problem.loss(state[1], m.storage[:dataStorage])
-        losses[i] = loss
-    end
-    bestIx = argmin(losses)
+    bestIx = argmin(m.losses)
     return (losses[bestIx], m.storage[:stateStorage][bestIx][1])
 end
 
