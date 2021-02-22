@@ -135,7 +135,7 @@ function run!(m::Manager, maxIter=nothing, maxTime=nothing)
 
 
     runBlock(maxIter, maxTime) do blocksIter
-        for i in 1:m.shuffler.popSize
+        Base.Threads.@threads for i in 1:m.shuffler.popSize
             rng_xor = RandomNumbers.Xorshifts.Xoroshiro128Star()
             if haskey(m.storage, :optimStorage)
                 optimStorage = m.storage[:optimStorage][i]
