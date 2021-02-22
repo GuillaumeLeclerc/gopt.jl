@@ -112,7 +112,7 @@ function allocateStorage!(m::Manager)
     m.storage[:dataStorage] = Storage.allocateCPU(m.problem.dataType, (1, ))[1]
     if !isnothing(m.optimizer.stateType)
         m.storage[:optimStorage] = Storage.allocateCPU(m.optimizer.stateType,
-                                                       (m.optimizer.solutionStates,))
+                                                       (m.shuffler.popSize,))
     end
 end
 
@@ -135,7 +135,7 @@ function run!(m::Manager, maxIter=nothing, maxTime=nothing)
 
 
     runBlock(maxIter, maxTime) do blocksIter
-        Base.Threads.@threads for i in 1:m.shuffler.popSize
+        for i in 1:m.shuffler.popSize
             rng_xor = RandomNumbers.Xorshifts.Xoroshiro128Star()
             if haskey(m.storage, :optimStorage)
                 optimStorage = m.storage[:optimStorage][i]
@@ -153,7 +153,7 @@ end
 
 function bestSolution(m::Manager)
     bestIx = argmin(m.losses)
-    return (losses[bestIx], m.storage[:stateStorage][bestIx][1])
+    return (m.losses[bestIx], m.storage[:stateStorage][bestIx][1])
 end
 
 export Manager
@@ -174,10 +174,10 @@ import .Shufflers
 data = TSP.generateRandomTSPData(10000)
 manager = Ma.Manager()
 manager.problem = TSP.generateProblemForData(data)
-manager.optimizer = Optim.RandomLocalSearch(manager.problem)
-manager.shuffler = Shufflers.Independent(16)
+manager.optimizer = Optim.ExhaustiveLocalSearch(manager.problem)
+manager.shuffler = Shufflers.Independent(64)
 Ma.allocateStorage!(manager)
 Ma.init!(manager)
-Ma.run!(manager, 10000000000000, 6)
+Ma.run!(manager, 10000000, 6)
 loss, solution = Ma.bestSolution(manager)
 print("LOSS: ", loss)
