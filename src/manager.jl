@@ -171,13 +171,18 @@ import .Shufflers
 # Code generation
 
 # data = TSP.readTourFile("./pla85900.tsp")
-data = TSP.generateRandomTSPData(10000)
+data = TSP.generateRandomTSPData(10^5)
 manager = Ma.Manager()
 manager.problem = TSP.generateProblemForData(data)
-manager.optimizer = Optim.ExhaustiveLocalSearch(manager.problem)
+#optimizers : ExhaustiveLocalSearch BasinHopping RandomLocalSearch SimulatedAnnealing
+optimizers = [
+              Optim.ExhaustiveLocalSearch, Optim.RandomLocalSearch,
+              Optim.SimulatedAnnealing, Optim.BasinHopping
+              ]
+manager.optimizer = optimizers[3](manager.problem)
 manager.shuffler = Shufflers.Independent(64)
 Ma.allocateStorage!(manager)
 Ma.init!(manager)
-Ma.run!(manager, 10000000, 6)
+Ma.run!(manager, 10^9, 50)
 loss, solution = Ma.bestSolution(manager)
 print("LOSS: ", loss)
